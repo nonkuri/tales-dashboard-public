@@ -280,6 +280,8 @@ function num(s){
 }
 // 「6月15日(月)」→ {m,d}。記録が飛んだ日数の計算に使う
 function parseMD(s){ const m=String(s).match(/(\d+)月(\d+)日/); return m?{m:+m[1],d:+m[2]}:null; }
+// 年入り日付 → {y,m,d}。ISO(2026-07-19 / 2026/07/19) と 和暦漢字(2026年7月19日) に対応
+function parseYMD(s){ const m=String(s).match(/(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/); return m?{y:+m[1],m:+m[2],d:+m[3]}:null; }
 // gviz の日付値 "Date(2026,2,4)"（月0始まり）→ "2026-03-04"
 function gvizDateISO(v){
   if(typeof v!=='string') return '';
@@ -312,6 +314,9 @@ function parseTable(rows){
       const i = idx(COLS[k]);
       rec[k] = i<0 ? null : (k==='date'||k==='time'||k==='title') ? (row[i]||'').trim() : num(row[i]);
     }
+    // 日付に年が含まれていれば実日付(dateISO)を付与（CSVでも年を尊重。年なしは現在年を仮定）
+    const ymd = parseYMD(rec.date);
+    if(ymd) rec.dateISO = `${ymd.y}-${String(ymd.m).padStart(2,'0')}-${String(ymd.d).padStart(2,'0')}`;
     data.push(rec);
   }
   if(!data.length) throw new Error('有効なデータ行がありません');
