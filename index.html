@@ -485,10 +485,15 @@ function renderTable(rows){
   let data=[...rows];
   if(sortState.col){
     data.sort((a,b)=>{
-      let x=a._raw[sortState.col], y=b._raw[sortState.col];
-      const nx=num(x), ny=num(y);
       let r;
-      if(nx!=null&&ny!=null) r=nx-ny; else r=String(x).localeCompare(String(y),'ja');
+      if(sortState.col===COLS.date){                 // 日付列は実日付で比較
+        const da=recDate(a), db=recDate(b);
+        r=(da?da.getTime():0)-(db?db.getTime():0);
+      }else{
+        let x=a._raw[sortState.col], y=b._raw[sortState.col];
+        const nx=num(x), ny=num(y);
+        if(nx!=null&&ny!=null) r=nx-ny; else r=String(x).localeCompare(String(y),'ja');
+      }
       return sortState.asc?r:-r;
     });
   }
