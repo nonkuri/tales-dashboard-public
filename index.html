@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作品アクセス解析ダッシュボード</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f6fb;
+    --bg-grad:
+      radial-gradient(1100px 520px at 100% -8%, #e9edff 0%, rgba(233,237,255,0) 60%),
+      radial-gradient(820px 460px at -6% 4%, #e6fbff 0%, rgba(230,251,255,0) 58%);
+    --panel:#ffffff; --panel-soft:#f8fafc;
+    --ink:#0f172a; --ink-soft:#334155; --muted:#64748b;
+    --line:#e9eef4; --line-soft:#f1f5f9;
+    --accent:#4f46e5; --accent-ink:#4338ca; --accent-soft:#eef2ff;
+    --good:#059669; --good-soft:rgba(5,150,105,.12);
+    --bad:#e11d48;  --bad-soft:rgba(225,29,72,.12);
+    --shadow-sm:0 1px 2px rgba(15,23,42,.05);
+    --shadow:0 1px 2px rgba(15,23,42,.05), 0 8px 24px -14px rgba(15,23,42,.18);
+    --shadow-lg:0 6px 16px -8px rgba(15,23,42,.16), 0 24px 48px -24px rgba(15,23,42,.26);
+    --radius:14px;
+    --c1:#4f46e5; --c2:#0ea5e9; --c3:#10b981; --c4:#f59e0b; --c5:#8b5cf6; --c6:#f43f5e;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%;}
+  body{margin:0;color:var(--ink);
+    background:var(--bg-grad), var(--bg); background-attachment:fixed; min-height:100vh;
+    font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+    line-height:1.55;font-size:14px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 56px;}
+
+  /* header */
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:18px;}
+  .eyebrow{display:inline-flex;align-items:center;gap:7px;color:var(--accent-ink);font-size:11.5px;font-weight:700;
+    letter-spacing:.04em;background:var(--accent-soft);border:1px solid #e0e4ff;border-radius:999px;padding:4px 12px;}
+  h1{font-size:30px;margin:12px 0 0;font-weight:800;line-height:1.2;letter-spacing:-.01em;}
+  .sub{color:var(--muted);font-size:12.5px;margin-top:6px;font-variant-numeric:tabular-nums;}
+  @media(max-width:600px){h1{font-size:23px;}.wrap{padding:20px 14px 40px;}}
+  .controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+
+  /* form controls */
+  select,button,input,textarea{font:inherit;border:1px solid var(--line);border-radius:10px;padding:8px 12px;
+    background:#fff;color:var(--ink);transition:border-color .15s, box-shadow .15s, background .15s, transform .05s;}
+  select{cursor:pointer;-webkit-appearance:none;appearance:none;padding-right:32px;
+    background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+    background-position:calc(100% - 16px) calc(50% + 1px),calc(100% - 11px) calc(50% + 1px);
+    background-size:5px 5px,5px 5px;background-repeat:no-repeat;}
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  button{cursor:pointer;background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;box-shadow:var(--shadow-sm);}
+  button:hover{background:var(--accent-ink);border-color:var(--accent-ink);}
+  button:active{transform:translateY(1px);}
+  button.ghost{background:#fff;color:var(--ink-soft);border-color:var(--line);box-shadow:none;}
+  button.ghost:hover{background:var(--panel-soft);border-color:#d8dfe8;color:var(--ink);}
+  #workSel{font-weight:600;min-width:180px;}
+  .status{font-size:12px;color:var(--muted);min-height:16px;margin:0 2px 18px;}
+  .status.err{color:var(--bad);font-weight:600;}
+
+  /* cards & grid */
+  .grid{display:grid;gap:16px;}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(158px,1fr));margin-bottom:10px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);}
+
+  .kpi{position:relative;overflow:hidden;transition:transform .15s, box-shadow .15s, border-color .15s;}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--kpi-c,var(--accent));opacity:.9;}
+  .kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:#dde4ee;}
+  .kpi .label{color:var(--muted);font-size:11.5px;font-weight:600;letter-spacing:.01em;display:flex;align-items:center;gap:7px;}
+  .kpi .label::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--kpi-c,var(--accent));flex:none;}
+  .kpi .val{font-size:27px;font-weight:800;margin-top:9px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1;}
+  .kpi-avg{color:var(--muted);font-size:11.5px;font-weight:500;margin-top:6px;font-variant-numeric:tabular-nums;}
+  .kpi-avg b{color:var(--ink-soft);font-weight:700;}
+  .kpi-foot{display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap;}
+  .delta{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;
+    padding:2px 8px;border-radius:999px;font-variant-numeric:tabular-nums;letter-spacing:.01em;}
+  .delta.up{color:var(--good);background:var(--good-soft);}
+  .delta.down{color:var(--bad);background:var(--bad-soft);}
+  .delta.flat{color:var(--muted);background:var(--line-soft);}
+  .kpi .since{color:var(--muted);font-weight:500;font-size:11px;}
+  .note{color:var(--muted);font-size:11px;margin:4px 2px 24px;line-height:1.5;}
+
+  /* section headers */
+  .kpi-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 2px 12px;}
+  .sec-title{font-size:13px;font-weight:700;color:var(--ink);letter-spacing:.01em;display:flex;align-items:center;gap:8px;}
+  .sec-title::before{content:"";width:4px;height:15px;border-radius:2px;background:var(--accent);}
+  .latest-date{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--accent-ink);
+    background:var(--accent-soft);border:1px solid #e0e4ff;border-radius:999px;padding:5px 13px;font-variant-numeric:tabular-nums;}
+  .latest-date .lbl{color:var(--muted);font-weight:600;}
+  .period-lbl{color:var(--muted);font-size:12px;font-weight:600;}
+
+  /* charts */
+  .charts{grid-template-columns:1fr 1fr;margin-bottom:10px;}
+  .chart-card{transition:box-shadow .15s, border-color .15s;}
+  .chart-card:hover{box-shadow:var(--shadow-lg);border-color:#dde4ee;}
+  .chart-card h3{margin:0 0 14px;font-size:13.5px;font-weight:700;color:var(--ink-soft);display:flex;align-items:baseline;gap:7px;}
+  .chart-card .hint{color:var(--muted);font-size:11px;font-weight:500;}
+  .chart-box{position:relative;height:264px;}
+  @media(max-width:760px){.charts{grid-template-columns:1fr;}}
+
+  /* table */
+  .table-card{overflow:auto;padding:4px;}
+  table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;white-space:nowrap;}
+  th,td{padding:9px 12px;border-bottom:1px solid var(--line-soft);text-align:right;font-variant-numeric:tabular-nums;}
+  th{position:sticky;top:0;background:var(--panel-soft);cursor:pointer;user-select:none;font-weight:700;color:var(--ink-soft);
+    border-bottom:1px solid var(--line);z-index:1;transition:color .12s;}
+  th:hover{color:var(--accent);}
+  th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--panel);}
+  td:first-child{font-weight:600;color:var(--ink);}
+  th:first-child{background:var(--panel-soft);z-index:2;}
+  tbody tr:hover td{background:var(--accent-soft);}
+  th.sorted{color:var(--accent);}
+  th.sorted::after{content:" ▾";}
+  th.sorted.asc::after{content:" ▴";}
+
+  /* settings */
+  .src-wrap{display:flex;align-items:flex-start;gap:10px;margin-bottom:18px;}
+  .src-wrap details.src{flex:1;min-width:0;margin-bottom:0;}
+  .src-wrap #workSel{flex:none;height:43px;}
+  @media(max-width:600px){.src-wrap{flex-direction:column;}.src-wrap #workSel{order:-1;width:100%;}}
+  details.src{margin-bottom:18px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm);}
+  details.src summary{cursor:pointer;color:var(--ink-soft);font-size:12.5px;font-weight:600;padding:12px 16px;
+    list-style:none;display:flex;align-items:center;gap:8px;}
+  details.src summary::-webkit-details-marker{display:none}
+  details.src[open] summary{border-bottom:1px solid var(--line-soft);}
+  details.src summary:hover{color:var(--accent);}
+  .src-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+  .src-help{color:var(--muted);font-size:12px;line-height:1.7;background:var(--panel-soft);
+    border:1px solid var(--line-soft);border-radius:8px;padding:10px 12px;}
+  .src-help b{color:var(--ink-soft);}
+  .src-help ol{margin:6px 0 0;padding-left:20px;}
+  .src-help li{margin:2px 0;}
+  .src-help code{background:var(--accent-soft);color:var(--accent-ink);padding:1px 6px;border-radius:4px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;}
+  .src-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .src-row input,.src-row textarea{flex:1;min-width:280px;font-size:12px;font-family:inherit;resize:vertical;}
+  .drop{border:1.5px dashed var(--line);border-radius:10px;padding:12px 14px;color:var(--muted);font-size:12px;
+    cursor:pointer;transition:border-color .15s, background .15s, color .15s;width:100%;}
+  .drop:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">📈 作品アクセス解析ダッシュボード</div>
+      <h1 id="workTitle">読み込み中…</h1>
+      <div class="sub" id="subTitle"></div>
+    </div>
+    <div class="controls">
+      <button id="reloadBtn">🔄 最新を取得</button>
+    </div>
+  </header>
+
+  <div class="src-wrap">
+    <details class="src">
+      <summary>⚙ データソース設定（スプレッドシート / タブ / ファイル）</summary>
+      <div class="src-body">
+      <div class="src-help">
+        使い始めの手順:
+        <ol>
+          <li>付属のテンプレートをコピーし、Googleスプレッドシートを <b>「リンクを知っている全員が閲覧可」</b> に設定</li>
+          <li>そのスプレッドシートのURLを下に貼って <b>「URLからID更新」</b></li>
+          <li>各作品タブをクリックするとURL末尾が <code>#gid=1234567</code> に変わります。その数字を作品ごとに改行またはカンマ区切りで入力し <b>「タブ一覧を更新」</b></li>
+        </ol>
+        ネットに繋がず試すだけなら、下の <b>CSV読み込み</b> でもOKです。
+      </div>
+      <div class="src-row">
+        <input id="urlInput" placeholder="スプレッドシートのURLを貼り付け">
+        <button class="ghost" id="saveUrlBtn">URLからID更新</button>
+      </div>
+      <div class="src-row">
+        <textarea id="gidsInput" rows="3" placeholder="各タブのURL末尾 #gid= の数字を、作品ごとに改行またはカンマ区切りで入力（例: 1234567, 8901234）"></textarea>
+        <button class="ghost" id="saveGidsBtn">タブ一覧を更新</button>
+      </div>
+      <div class="src-row">
+        <label class="drop">📄 CSVファイルをここにドラッグ、またはクリックで選択（オフライン用）
+          <input type="file" id="fileInput" accept=".csv,text/csv" style="display:none">
+        </label>
+      </div>
+      </div>
+    </details>
+    <select id="workSel" title="表示する作品タブを選択"></select>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="kpi-head">
+    <div class="sec-title" style="margin:0">主要指標</div>
+    <div class="latest-date" id="latestDate"></div>
+  </div>
+  <div class="grid kpis" id="kpis"></div>
+  <div class="note">※「前日増減」はカード内の日付（前回記録）との差です。記録が飛んだ日は1日あたりの平均に換算しています。</div>
+
+  <div class="kpi-head">
+    <div class="sec-title" style="margin:0">推移グラフ</div>
+    <div class="controls">
+      <label class="period-lbl" for="periodSel">表示期間</label>
+      <select id="periodSel" title="グラフの表示期間">
+        <option value="7">直近7日</option>
+        <option value="14">直近14日</option>
+        <option value="30">直近30日</option>
+        <option value="90">直近3か月</option>
+        <option value="180">直近6か月</option>
+        <option value="365">直近1年間</option>
+        <option value="all" selected>全期間</option>
+        <option value="custom">カスタム…</option>
+      </select>
+      <span id="customRange" style="display:none;align-items:center;gap:6px;">
+        <input type="date" id="dateFrom" title="開始日">
+        <span style="color:var(--muted)">〜</span>
+        <input type="date" id="dateTo" title="終了日">
+      </span>
+    </div>
+  </div>
+  <div class="grid charts">
+    <div class="card chart-card"><h3>PV・スキの推移<span class="hint">日次</span></h3><div class="chart-box"><canvas id="chPV"></canvas></div></div>
+    <div class="card chart-card"><h3>ブックマーク・コメント・レビュー<span class="hint">日次</span></h3><div class="chart-box"><canvas id="chEngage"></canvas></div></div>
+    <div class="card chart-card"><h3>前日増減<span class="hint">記録が飛んだ日は1日あたりに換算</span></h3><div class="chart-box"><canvas id="chDelta"></canvas></div></div>
+    <div class="card chart-card"><h3>質の指標<span class="hint">スキ率・読了率（%）</span></h3><div class="chart-box"><canvas id="chQuality"></canvas></div></div>
+  </div>
+
+  <div class="sec-title">日次データ <span class="hint" style="color:var(--muted);font-weight:400">（列ヘッダをクリックで並び替え）</span></div>
+  <div class="card table-card">
+    <table id="dataTable"><thead></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script>
+// ===== データソース設定 =====
+// 配布版のため空にしています。画面の「データソース設定」パネルから
+// スプレッドシートのURL（ID）と作品タブの gid を設定してください（localStorageに保存されます）。
+const DEFAULT_ID   = "";
+const DEFAULT_GID  = "";     // 起動時に最初に表示するタブ（任意）
+const DEFAULT_GIDS = [];     // 作品タブ(gid)一覧
+
+// 年が判らない日付（CSV等）の解釈に使う年。配布先の環境に合わせ実行時の現在年を採用。
+const ASSUME_YEAR = new Date().getFullYear();
+
+// ---- 列定義（ヘッダ名で対応付け。シートの列順が変わっても追従） ----
+const COLS = {
+  date:'データ取得日', time:'データ取得時間', title:'作品タイトル',
+  topPV:'作品トップPV', epPV:'エピソードPV', suki:'スキ', bm:'ブックマーク',
+  comment:'コメント', review:'推薦レビュー', readRate:'読了率',
+  episodes:'公開話数', chars:'公開文字数', pvTotal:'PV合計',
+  topPvRatio:'作品トップPVの割合', sukiPerPV:'スキ/エピソードPV',
+  pvPerEp:'エピソードPV/話', sukiPerEp:'スキ/話', avgChars:'平均文字数',
+  epPvDelta:'エピソードPV前日増減', sukiDelta:'スキ前日増減'
+};
+
+let TABS = [];       // [{gid, title, raw:[...]}] タブ（作品）ごとのデータ
+let HEADERS = [];    // 表示用ヘッダ（空列を除く）
+let curGid = null;   // 表示中のタブgid
+let charts = {};
+
+// ---------- CSV パース ----------
+function parseCSV(text){
+  const rows=[]; let row=[], field='', inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inQ=false; }
+      else field+=c;
+    }else{
+      if(c==='"') inQ=true;
+      else if(c===','){ row.push(field); field=''; }
+      else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if(c!=='\r') field+=c;
+    }
+  }
+  if(field!=='' || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function num(s){
+  if(s==null) return null;
+  s=String(s).trim();
+  if(s==='') return null;
+  s=s.replace(/,/g,'').replace(/%/g,'');
+  const v=parseFloat(s);
+  return isNaN(v)?null:v;
+}
+// 「6月15日(月)」→ {m,d}。記録が飛んだ日数の計算に使う
+function parseMD(s){ const m=String(s).match(/(\d+)月(\d+)日/); return m?{m:+m[1],d:+m[2]}:null; }
+// gviz の日付値 "Date(2026,2,4)"（月0始まり）→ "2026-03-04"
+function gvizDateISO(v){
+  if(typeof v!=='string') return '';
+  const m=v.match(/Date\((\d+),(\d+),(\d+)/);
+  if(!m) return '';
+  return `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+}
+function elapsedDays(a,b){
+  const da=recDate(a), db=recDate(b);
+  if(!da||!db) return 1;
+  const diff=Math.round((db-da)/86400000);
+  return diff>0?diff:1;
+}
+
+// ---------- データ取り込み ----------
+// 2次元配列（1行目=ヘッダ）を解析して {headers, data} を返す（グローバルは変更しない）
+function parseTable(rows){
+  if(!rows.length) throw new Error('データが空です');
+  const head = rows[0].map(h=>String(h).trim());
+  const headers = head.filter(h=>h!=='');         // 末尾の空列を除外
+  const idx = name => head.indexOf(name);
+  const data = [];
+  for(let r=1;r<rows.length;r++){
+    const row = rows[r];
+    const title = (row[idx(COLS.title)]||'').trim();
+    if(!title) continue;                            // 空行スキップ
+    const rec = { _raw:{} };
+    headers.forEach(h=>{ rec._raw[h] = (row[head.indexOf(h)]||'').trim(); });
+    for(const k in COLS){
+      const i = idx(COLS[k]);
+      rec[k] = i<0 ? null : (k==='date'||k==='time'||k==='title') ? (row[i]||'').trim() : num(row[i]);
+    }
+    data.push(rec);
+  }
+  if(!data.length) throw new Error('有効なデータ行がありません');
+  return { headers, data };
+}
+
+// ---------- 描画 ----------
+const fmt = v => v==null ? '—' : (Number.isInteger(v)? v.toLocaleString() : v.toLocaleString(undefined,{maximumFractionDigits:1}));
+const pct = v => v==null ? '—' : v.toLocaleString(undefined,{maximumFractionDigits:1})+'%';
+
+function currentRows(){
+  const t = TABS.find(t=>t.gid===curGid);
+  return t ? t.raw : [];
+}
+
+function renderKPIs(rows){
+  const last = rows[rows.length-1], prev = rows[rows.length-2];
+  const items = [
+    {k:'epPV',  label:'エピソードPV', f:fmt, c:'--c1', perEp:true},
+    {k:'pvTotal',label:'PV合計', f:fmt, c:'--c2', perEp:true},
+    {k:'suki',  label:'スキ', f:fmt, c:'--c3', perEp:true},
+    {k:'bm',    label:'ブックマーク', f:fmt, c:'--c4'},
+    {k:'comment',label:'コメント', f:fmt, c:'--c5', perEp:true},
+    {k:'review',label:'推薦レビュー', f:fmt, c:'--c6'},
+    {k:'readRate',label:'読了率', f:pct, c:'--c2'},
+    {k:'episodes',label:'公開話数', f:fmt, c:'--c3'},
+    {k:'chars', label:'公開文字数', f:fmt, c:'--c4', perEp:true},
+  ];
+  const eps = last.episodes;   // 公開話数（1話あたり平均の分母）
+  const box = document.getElementById('kpis'); box.innerHTML='';
+  items.forEach(it=>{
+    const cur=last[it.k], pv=prev?prev[it.k]:null;
+    let foot='<div class="kpi-foot"><span class="delta flat">—</span></div>';
+    if(cur!=null && pv!=null){
+      const days = elapsedDays(prev, last);
+      const d = (cur-pv)/days;                       // 1日あたりに換算（飛び日は日割り）
+      const cls = d>0?'up':d<0?'down':'flat';
+      const arrow = d>0?'▲':d<0?'▼':'±';
+      const absd = Math.abs(d);
+      const mag = it.f===pct ? absd.toFixed(1)+'pt'
+        : (Number.isInteger(absd)? absd.toLocaleString() : absd.toLocaleString(undefined,{maximumFractionDigits:1}));
+      const valTxt = `${arrow} ${d===0 ? '0' : mag}`;
+      const since = prev.date ? `<span class="since">${prev.date}比</span>` : '';
+      foot=`<div class="kpi-foot"><span class="delta ${cls}" title="前日増減">${valTxt}</span>${since}</div>`;
+    }
+    let avg='';
+    if(it.perEp && cur!=null && eps){
+      const per = cur/eps;
+      const perTxt = per.toLocaleString(undefined,{maximumFractionDigits:1});
+      avg=`<div class="kpi-avg">1話あたり <b>${perTxt}</b></div>`;
+    }
+    const el=document.createElement('div');
+    el.className='card kpi';
+    el.style.setProperty('--kpi-c', getCss(it.c));
+    el.innerHTML=`<div class="label">${it.label}</div><div class="val">${it.f(cur)}</div>${avg}${foot}`;
+    box.appendChild(el);
+  });
+}
+
+if(window.Chart){
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = '#64748b';
+}
+const GRID = 'rgba(148,163,184,.16)';
+const AXIS = '#94a3b8';
+const baseOpts = {
+  responsive:true, maintainAspectRatio:false,
+  interaction:{mode:'index',intersect:false},
+  plugins:{
+    legend:{labels:{boxWidth:8,boxHeight:8,usePointStyle:true,pointStyle:'circle',padding:14,font:{size:11}}},
+    tooltip:{backgroundColor:'rgba(15,23,42,.92)',padding:10,cornerRadius:8,boxPadding:5,usePointStyle:true,
+      titleColor:'#f8fafc',bodyColor:'#e2e8f0',titleFont:{size:11,weight:'600'},bodyFont:{size:11},
+      borderColor:'rgba(255,255,255,.08)',borderWidth:1,displayColors:true}
+  },
+  scales:{
+    x:{grid:{display:false},border:{display:false},
+       ticks:{font:{size:10},color:AXIS,maxRotation:0,autoSkip:true,maxTicksLimit:8}},
+    y:{grid:{color:GRID},border:{display:false},ticks:{font:{size:10},color:AXIS,padding:6}}
+  }
+};
+function line(ctx,labels,datasets,extra={}){
+  return new Chart(ctx,{type:'line',data:{labels,datasets},
+    options:{...baseOpts,...extra,scales:{...baseOpts.scales,...(extra.scales||{})}}});
+}
+function ds(label,data,color,axis){
+  return {label,data,borderColor:color,backgroundColor:color+'22',borderWidth:2.5,
+    pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:color,pointHoverBorderColor:'#fff',pointHoverBorderWidth:2,
+    tension:.35,yAxisID:axis||'y',spanGaps:true};
+}
+
+function renderCharts(rows){
+  Object.values(charts).forEach(c=>c&&c.destroy());
+  const L = rows.map(r=>r.date);
+  const get = k => rows.map(r=>r[k]);
+
+  charts.pv = line(document.getElementById('chPV'), L, [
+    ds('エピソードPV', get('epPV'), getCss('--c1')),
+    ds('PV合計', get('pvTotal'), getCss('--c2')),
+    ds('スキ', get('suki'), getCss('--c3')),
+  ]);
+
+  charts.engage = line(document.getElementById('chEngage'), L, [
+    ds('ブックマーク', get('bm'), getCss('--c4')),
+    ds('コメント', get('comment'), getCss('--c5')),
+    ds('推薦レビュー', get('review'), getCss('--c6')),
+  ]);
+
+  charts.delta = new Chart(document.getElementById('chDelta'),{
+    type:'bar',
+    data:{labels:L,datasets:[
+      {label:'エピソードPV 前日増減',data:get('epPvDelta'),backgroundColor:getCss('--c1')+'cc',borderRadius:4,maxBarThickness:22},
+      {label:'スキ 前日増減',data:get('sukiDelta'),backgroundColor:getCss('--c3')+'cc',borderRadius:4,maxBarThickness:22},
+    ]},
+    options:{...baseOpts}
+  });
+
+  charts.quality = line(document.getElementById('chQuality'), L, [
+    ds('スキ率 (スキ/PV)', get('sukiPerPV'), getCss('--c5')),
+    ds('読了率', get('readRate'), getCss('--c2')),
+  ], {scales:{y:{grid:{color:GRID},border:{display:false},
+      ticks:{callback:v=>v+'%',font:{size:10},color:AXIS,padding:6}}}});
+}
+function getCss(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+// グラフ表示期間。'all' / 日数(7,14,30,90,180,365) / 'custom'（任意の開始〜終了日）
+let chartPeriod = localStorage.getItem('chartPeriod') || 'all';
+let customFrom = localStorage.getItem('chartFrom') || '';  // "YYYY-MM-DD"
+let customTo   = localStorage.getItem('chartTo')   || '';
+// レコードの実日付 → Date。スプレッドシート由来は dateISO（年あり）、CSV等は年不明→ ASSUME_YEAR 仮定。
+// 文字列を渡された場合も ASSUME_YEAR 仮定でパース
+function recDate(r){
+  if(!r) return null;
+  if(typeof r==='string'){ const p=parseMD(r); return p?new Date(ASSUME_YEAR,p.m-1,p.d):null; }
+  if(r.dateISO){ const [Y,M,D]=r.dateISO.split('-').map(Number); return new Date(Y,M-1,D); }
+  const p=parseMD(r.date); return p?new Date(ASSUME_YEAR,p.m-1,p.d):null;
+}
+// 日付入力（"YYYY-MM-DD"）→ Date（実年で比較）
+function inputDate(v){ if(!v) return null; const [Y,M,D]=v.split('-').map(Number); return new Date(Y,M-1,D); }
+function daysBetween(a,b){
+  const da=recDate(a), db=recDate(b);
+  if(!da||!db) return 0;
+  return Math.round((db-da)/86400000);
+}
+function filterByPeriod(rows){
+  if(rows.length<2) return rows;
+  if(chartPeriod==='all') return rows;
+  if(chartPeriod==='custom'){
+    const f=inputDate(customFrom), t=inputDate(customTo);
+    if(!f && !t) return rows;
+    const out=rows.filter(r=>{ const d=recDate(r); if(!d) return true;
+      if(f && d<f) return false; if(t && d>t) return false; return true; });
+    return out.length ? out : rows;
+  }
+  const n=+chartPeriod; if(!n) return rows;
+  const last=rows[rows.length-1];
+  const out=rows.filter(r=>daysBetween(r, last) < n);
+  return out.length ? out : rows;
+}
+
+let sortState={col:null,asc:false};
+function renderTable(rows){
+  const thead=document.querySelector('#dataTable thead');
+  const tbody=document.querySelector('#dataTable tbody');
+  thead.innerHTML='<tr>'+HEADERS.map(h=>`<th data-h="${h}">${h}</th>`).join('')+'</tr>';
+  let data=[...rows];
+  if(sortState.col){
+    data.sort((a,b)=>{
+      let x=a._raw[sortState.col], y=b._raw[sortState.col];
+      const nx=num(x), ny=num(y);
+      let r;
+      if(nx!=null&&ny!=null) r=nx-ny; else r=String(x).localeCompare(String(y),'ja');
+      return sortState.asc?r:-r;
+    });
+  }
+  tbody.innerHTML=data.map(r=>'<tr>'+HEADERS.map(h=>`<td>${r._raw[h]||''}</td>`).join('')+'</tr>').join('');
+  thead.querySelectorAll('th').forEach(th=>{
+    const h=th.dataset.h;
+    if(h===sortState.col){th.classList.add('sorted');th.classList.toggle('asc',sortState.asc);}
+    th.onclick=()=>{
+      if(sortState.col===h) sortState.asc=!sortState.asc;
+      else{sortState.col=h;sortState.asc=false;}
+      renderTable(currentRows());
+    };
+  });
+}
+
+function renderAll(){
+  const rows=currentRows();
+  if(!rows.length) return;
+  renderKPIs(rows);
+  if(window._syncCustomUI) window._syncCustomUI();
+  renderCharts(filterByPeriod(rows));
+  renderTable(rows);
+  const last=rows[rows.length-1];
+  document.getElementById('workTitle').textContent = last.title;
+  document.getElementById('subTitle').textContent =
+    `${rows[0].date} 〜 ${last.date}（${rows.length}日分）`;
+  document.getElementById('latestDate').innerHTML =
+    `<span class="lbl">📅 最新データ</span> ${last.date}${last.time?`　${last.time}`:''}`;
+}
+
+function buildTabSelector(){
+  const sel=document.getElementById('workSel');
+  sel.innerHTML=TABS.map(t=>`<option value="${t.gid}">${t.title}</option>`).join('');
+  sel.style.display = TABS.length>1 ? '' : 'none';
+  if(!TABS.find(t=>t.gid===curGid)) curGid = TABS.length ? TABS[0].gid : null;
+  sel.value=curGid;
+  sel.onchange=()=>{ curGid=sel.value; localStorage.setItem('curGid',curGid);
+    sortState={col:null,asc:false}; renderAll(); };
+}
+
+// ---------- 設定（ID / gid一覧） ----------
+function getId(){ return localStorage.getItem('sheetId')||DEFAULT_ID; }
+function getGids(){
+  try{ const a=JSON.parse(localStorage.getItem('gids')); if(Array.isArray(a)&&a.length) return a.map(String); }catch(e){}
+  return DEFAULT_GIDS.slice();
+}
+function setStatus(msg,err=false){
+  const s=document.getElementById('status');
+  s.textContent=msg; s.classList.toggle('err',err);
+}
+// 未設定（配布直後）の案内表示
+function showOnboarding(){
+  document.getElementById('workTitle').textContent='ようこそ 👋';
+  document.getElementById('subTitle').textContent='データソースを設定すると解析が表示されます';
+  setStatus('👇「データソース設定」を開いて、スプレッドシートのURLと作品タブの gid を設定してください（オフラインで試すならCSV読み込みでもOK）。');
+  document.querySelector('details.src').open=true;
+}
+
+// ---------- gviz JSON を <script> タグで取得（CORS非対象 → file:// でも動く） ----------
+// 全タブを並行取得。各タブは固有コールバックで受け取る
+function loadAllTabs(){
+  const id=getId(), gids=getGids();
+  if(!id || !gids.length){ showOnboarding(); return; }   // 未設定ならエラーではなく案内を表示
+  setStatus(`⏳ ${gids.length}タブを取得中…`);
+  TABS=[]; HEADERS=[];
+  curGid = localStorage.getItem('curGid') || DEFAULT_GID;
+  let done=0, anyOk=false;
+  const finish=()=>{ if(done<gids.length) return;
+    if(!anyOk){ setStatus('⚠ 取得に失敗しました。ネット接続・共有設定（リンクを知っている全員が閲覧可）・タブ(gid)設定をご確認ください。',true);
+      document.querySelector('details.src').open=true; return; }
+    const order=gids.map(String);
+    TABS.sort((a,b)=>order.indexOf(a.gid)-order.indexOf(b.gid));
+    dedupeTitles();
+    if(!TABS.find(t=>t.gid===curGid)) curGid=TABS[0].gid;
+    buildTabSelector();
+    renderAll();
+    setStatus(`✅ ${TABS.length}作品を取得　${new Date().toLocaleString('ja-JP')}`);
+  };
+  gids.forEach(gid=>{
+    const cb='gvizCb_'+gid;
+    window[cb]=function(resp){
+      done++;
+      try{
+        if(!resp || resp.status==='error') throw 0;
+        const t=resp.table;
+        const header=t.cols.map(c=>(c.label||'').trim());
+        const cell=c=>!c?'':(c.f!=null?String(c.f):(c.v!=null?String(c.v):''));
+        const rows=[header, ...t.rows.map(r=>t.cols.map((_,i)=>cell(r.c[i])))];
+        const {headers,data}=parseTable(rows);
+        // 日付セルの v="Date(y,m,d)"（年あり・月0始まり）から実日付を各レコードへ付与
+        const di=header.indexOf(COLS.date), ti=header.indexOf(COLS.title);
+        if(di>=0){
+          const isos=[];
+          t.rows.forEach(r=>{ const tv=ti>=0?cell(r.c[ti]):'x';
+            if(!String(tv).trim()) return;            // parseTable と同じ空行スキップで整列
+            isos.push(gvizDateISO(r.c[di] && r.c[di].v)); });
+          data.forEach((rec,i)=>{ if(isos[i]) rec.dateISO=isos[i]; });
+        }
+        if(!HEADERS.length) HEADERS=headers;
+        const title=(data.find(d=>d.title)||{}).title || ('タブ '+gid);
+        TABS.push({gid:String(gid), title, raw:data});
+        anyOk=true;
+      }catch(e){}
+      finally{ delete window[cb]; finish(); }
+    };
+    const tqx=encodeURIComponent('out:json;responseHandler:'+cb);
+    const s=document.createElement('script');
+    s.src=`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?gid=${gid}&headers=1&tqx=${tqx}&_=${Date.now()}`;
+    s.onerror=()=>{ done++; delete window[cb]; finish(); };
+    document.head.appendChild(s);
+    setTimeout(()=>s.remove(),10000);
+  });
+}
+// 同名作品にはタブ番号を付けて区別
+function dedupeTitles(){
+  const total={}; TABS.forEach(t=>total[t.title]=(total[t.title]||0)+1);
+  const seen={};
+  TABS.forEach(t=>{ if(total[t.title]>1){ seen[t.title]=(seen[t.title]||0)+1; t.title=`${t.title}（${seen[t.title]}）`; } });
+}
+
+// 単一CSVファイル（オフライン時の予備）→ 1タブとして読み込む
+function loadFile(text,name){
+  try{
+    const {headers,data}=parseTable(parseCSV(text));
+    HEADERS=headers;
+    TABS=[{gid:'file', title:(data.find(d=>d.title)||{}).title||name, raw:data}];
+    curGid='file';
+    buildTabSelector();
+    renderAll();
+    setStatus('✅ ファイル: '+name+'　'+new Date().toLocaleString('ja-JP'));
+  }catch(e){ setStatus('⚠ 解析エラー: '+e.message,true); }
+}
+
+// ---------- イベント ----------
+document.getElementById('reloadBtn').onclick=loadAllTabs;
+(()=>{ const sel=document.getElementById('periodSel');
+  const box=document.getElementById('customRange');
+  const fromEl=document.getElementById('dateFrom'), toEl=document.getElementById('dateTo');
+  // レコード → 入力欄用 "YYYY-MM-DD"。dateISO（年あり）優先、無ければ ASSUME_YEAR 仮定
+  const recISO=r=>{ if(r&&r.dateISO) return r.dateISO; const p=parseMD(r&&r.date);
+    return p?`${ASSUME_YEAR}-${String(p.m).padStart(2,'0')}-${String(p.d).padStart(2,'0')}`:''; };
+  function syncCustomUI(){
+    const on = sel.value==='custom';
+    box.style.display = on ? 'inline-flex' : 'none';
+    if(on){
+      const rows=currentRows();
+      if(rows.length){
+        const first=recISO(rows[0]), last=recISO(rows[rows.length-1]);
+        fromEl.min=toEl.min=first; fromEl.max=toEl.max=last;
+        if(!customFrom) customFrom=first;
+        if(!customTo)   customTo=last;
+      }
+      fromEl.value=customFrom; toEl.value=customTo;
+    }
+  }
+  function applyAndRender(){ localStorage.setItem('chartPeriod',chartPeriod);
+    localStorage.setItem('chartFrom',customFrom); localStorage.setItem('chartTo',customTo);
+    renderCharts(filterByPeriod(currentRows())); }
+  sel.value=chartPeriod;
+  syncCustomUI();
+  sel.onchange=()=>{ chartPeriod=sel.value; syncCustomUI(); applyAndRender(); };
+  fromEl.onchange=()=>{ customFrom=fromEl.value; applyAndRender(); };
+  toEl.onchange=()=>{ customTo=toEl.value; applyAndRender(); };
+  // 作品切り替え時にカスタム期間の入力欄を新データの範囲へ更新する
+  window._syncCustomUI=syncCustomUI;
+})();
+document.getElementById('saveUrlBtn').onclick=()=>{
+  const u=document.getElementById('urlInput').value.trim();
+  const id=(u.match(/\/d\/([a-zA-Z0-9\-_]+)/)||[])[1];
+  if(!id){ setStatus('⚠ URLから スプレッドシートID を読み取れませんでした。',true); return; }
+  localStorage.setItem('sheetId',id);
+  loadAllTabs();
+};
+document.getElementById('saveGidsBtn').onclick=()=>{
+  const raw=document.getElementById('gidsInput').value;
+  const gids=(raw.match(/\d+/g)||[]);
+  if(!gids.length){ setStatus('⚠ gid を読み取れませんでした。',true); return; }
+  localStorage.setItem('gids',JSON.stringify(gids));
+  localStorage.removeItem('curGid');
+  loadAllTabs();
+};
+const fileInput=document.getElementById('fileInput');
+fileInput.onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const rd=new FileReader(); rd.onload=()=>loadFile(rd.result,f.name); rd.readAsText(f,'utf-8');
+};
+const drop=document.querySelector('.drop');
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.style.borderColor='var(--accent)';}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.style.borderColor='var(--line)';}));
+drop.addEventListener('drop',e=>{
+  const f=e.dataTransfer.files[0]; if(!f)return;
+  const rd=new FileReader(); rd.onload=()=>loadFile(rd.result,f.name); rd.readAsText(f,'utf-8');
+});
+
+// ---------- 起動 ----------
+document.getElementById('gidsInput').value=getGids().join('\n');
+loadAllTabs();
+</script>
+</body>
+</html>
